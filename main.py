@@ -10,8 +10,8 @@ import ssl
 from collections import defaultdict
 import numpy as np
 import coseno
+import userBased
 from tkinter import PhotoImage
-
 
 class MovieApp:
     def __init__(self, root, movies_list):
@@ -98,10 +98,26 @@ class MovieApp:
         # Crear una nueva ventana
         details_window = tk.Toplevel(self.root)
         details_window.title(movie.title)
-        details_window.geometry("720x900")  # Altura aumentada
+        details_window.geometry("800x900")  # Tamaño inicial
+
+        # Crear un canvas para permitir scroll
+        canvas = tk.Canvas(details_window, width=720, height=900)
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Crear una barra de desplazamiento vertical
+        scrollbar = tk.Scrollbar(details_window, orient="vertical", command=canvas.yview)
+        scrollbar.pack(side="right", fill="y")
+
+        # Vincular el canvas con la barra de desplazamiento
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+        # Crear un frame dentro del canvas para colocar los widgets
+        details_frame = tk.Frame(canvas)
+        canvas.create_window((0, 0), window=details_frame, anchor="nw")
 
         # Mostrar el título (arriba, grande y centrado)
-        title_label = tk.Label(details_window, text=movie.title, font=("Helvetica", 24, "bold"), wraplength=700,
+        title_label = tk.Label(details_frame, text=movie.title, font=("Helvetica", 24, "bold"), wraplength=700,
                                anchor="center")
         title_label.pack(pady=10)
 
@@ -113,17 +129,17 @@ class MovieApp:
                 image = image.resize((200, 300), Image.Resampling.LANCZOS)
                 image = ImageTk.PhotoImage(image)
 
-            image_label = tk.Label(details_window, image=image)
+            image_label = tk.Label(details_frame, image=image)
             image_label.image = image
             image_label.pack(pady=10)
         except Exception as e:
             print(f"Error al cargar la imagen: {e}")
-            image_label = tk.Label(details_window, text="No image available", width=20, height=10)
+            image_label = tk.Label(details_frame, text="No image available", width=20, height=10)
             image_label.pack(pady=10)
 
         # Mostrar detalles adicionales (debajo de la imagen)
-        details_frame = tk.Frame(details_window)
-        details_frame.pack(pady=10)
+        info_frame = tk.Frame(details_frame)
+        info_frame.pack(pady=10)
 
         # Mostrar cada detalle con etiquetas en negrita y valores normales
         details = [
@@ -134,7 +150,7 @@ class MovieApp:
         ]
 
         for label, value in details:
-            row_frame = tk.Frame(details_frame)
+            row_frame = tk.Frame(info_frame)
             row_frame.pack(anchor="w", pady=2)
             bold_label = tk.Label(row_frame, text=label, font=("Helvetica", 12, "bold"))
             bold_label.pack(side="left")
@@ -142,7 +158,7 @@ class MovieApp:
             value_label.pack(side="left")
 
         # Mostrar la sinopsis (con márgenes laterales)
-        synopsis_frame = tk.Frame(details_window, padx=20)  # Márgenes laterales
+        synopsis_frame = tk.Frame(details_frame, padx=20)  # Márgenes laterales
         synopsis_frame.pack(fill="x", pady=10)
         synopsis_label = tk.Label(
             synopsis_frame,
@@ -157,7 +173,7 @@ class MovieApp:
         similar_movies = coseno.recommend_movies(movie.get_id(), 4)
 
         # Input para puntuar
-        rate_frame = tk.Frame(details_window)
+        rate_frame = tk.Frame(details_frame)
         rate_frame.pack(pady=10)
 
         rate_label = tk.Label(rate_frame, text="Ingresa tu puntuación (1-5):", font=("Helvetica", 12))
@@ -167,7 +183,7 @@ class MovieApp:
         rate_entry.pack(side="left", padx=5)
 
         # Crear un frame para las películas recomendadas
-        recommended_frame = tk.Frame(details_window)
+        recommended_frame = tk.Frame(details_frame)
         recommended_frame.pack(pady=10)
 
         # Crear el label para "Películas Similares" con mayor tamaño y alineado a la izquierda
@@ -175,7 +191,7 @@ class MovieApp:
         similar_movies_label.grid(row=0, column=0, columnspan=1, pady=10, sticky="w",
                                   padx=(10, 0))  # Agregar margen a la izquierda
 
-        # Iterar para mostrar las películas similares debajo del primer label
+        # Mostrar las películas similares
         for i, movie_index in enumerate(similar_movies):
             # Cargar la imagen de la película
             with urllib.request.urlopen(self.movies_list[movie_index].get_image_url()) as url:
@@ -186,8 +202,7 @@ class MovieApp:
 
             # Crear una columna para la imagen y el nombre
             movie_column = tk.Frame(recommended_frame)
-            movie_column.grid(row=1, column=i, padx=10, pady=5,  sticky="w"
-                             )  # Asegurarse de que las imágenes estén alineadas a la izquierda
+            movie_column.grid(row=1, column=i, padx=10, pady=5, sticky="w")
 
             # Mostrar la imagen de la película
             image_label = tk.Label(movie_column, image=image)
@@ -198,13 +213,44 @@ class MovieApp:
             name_label = tk.Label(movie_column, text=self.movies_list[movie_index].get_title(), font=("Helvetica", 10))
             name_label.pack()
 
+        # Vincular el evento de scroll con la rueda del ratón
+        details_window.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+
         # Crear el label para "Películas que Creemos que te Gustarán" con mayor tamaño y alineado a la izquierda
         recommended_movies_label = tk.Label(recommended_frame, text="Películas que Creemos que te Gustarán",
                                             font=("Helvetica", 16, "bold"))
         recommended_movies_label.grid(row=2, column=0, columnspan=1, pady=10, sticky="w",
                                       padx=(10, 0))  # Agregar margen a la izquierda
 
+        similar_movies2 = userBased.user_based_recommendations(0, 4)
+        # Imprimimos los IDs de la películas recomendadas por los usuarios
+        #print(similar_movies2)
 
+        # Iterar para mostrar las películas recomendadas (segunda sección)
+        for i, movie_index in enumerate(similar_movies2):
+            # Cargar la imagen de la película
+            with urllib.request.urlopen(self.movies_list[movie_index].get_image_url()) as url:
+                img_data = url.read()
+                image = Image.open(io.BytesIO(img_data))
+                image = image.resize((100, 150), Image.Resampling.LANCZOS)  # Redimensionar la imagen
+                image = ImageTk.PhotoImage(image)
+
+            # Crear una columna para la imagen y el nombre
+            movie_column = tk.Frame(recommended_frame)
+            movie_column.grid(row=3, column=i, padx=10, pady=5, sticky="w")  # Cambiar a row=3
+
+            # Mostrar la imagen de la película
+            image_label = tk.Label(movie_column, image=image)
+            image_label.image = image  # Mantener una referencia a la imagen
+            image_label.pack()
+
+            # Mostrar el nombre de la película debajo de la imagen
+            name_label = tk.Label(movie_column, text=self.movies_list[movie_index].get_title(), font=("Helvetica", 10))
+            name_label.pack()
+
+            # Mostrar el nombre de la película debajo de la imagen
+            name_label = tk.Label(movie_column, text=self.movies_list[movie_index].get_title(), font=("Helvetica", 10))
+            name_label.pack()
 
         # Añadir un botón de cierre
         close_button = tk.Button(details_window, text="Cerrar", command=details_window.destroy)
