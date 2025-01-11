@@ -1,28 +1,28 @@
 import csv
 
 import pandas as pd
-import matplotlib.pyplot as plt
-from bs4 import BeautifulSoup
-import requests
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 data = pd.read_csv("peliculas.csv", delimiter=',')
 
 class User:
-    def __init__(self, username, email):
+    def __init__(self, id, username, email):
+        self.id = id
         self.username = username
         self.email = email
-        self.reviews = []
 
-    def add_review(self, review):
-        self.reviews.append(review)
+    def get_id(self):
+        return self.id
 
     def __str__(self):
-        return f"User(username={self.username}, email={self.email}, reviews={len(self.reviews)})"
+        return f"User(username={self.username}, email={self.email})"
 
 
 class Movie:
-    def __init__(self, title, year, synopsis, critic_score, people_score, consensus, total_reviews, total_ratings,
+    def __init__(self, id, title, year, synopsis, critic_score, people_score, consensus, total_reviews, total_ratings,
                  genre, director, producer, writer, release_date, box_office, runtime, production_company, crew, image_url):
+        self.id = id
         self.title = title
         self.year = year
         self.synopsis = synopsis
@@ -40,10 +40,7 @@ class Movie:
         self.runtime = runtime
         self.production_company = production_company
         self.crew = crew
-
-
         self.reviews = []
-
         self.imageUrl = image_url
 
     def set_image_url(self, url):
@@ -51,6 +48,9 @@ class Movie:
 
     def get_image_url(self):
         return self.imageUrl
+
+    def get_id(self):
+        return self.id
 
     def add_review(self, review):
         self.reviews.append(review)
@@ -63,12 +63,20 @@ class Movie:
     def get_title(self):
         return self.title
 
+    def get_critic_score(self):
+        return self.critic_score
+
+    def get_people_score(self):
+        return self.people_score
+
     def get_synopsis(self):
         return self.synopsis
 
     def get_genre(self):
         return self.genre
 
+    def get_year(self):
+        return self.year
 
     def get_director(self):
         return self.director
@@ -94,18 +102,15 @@ class Movie:
     def get_crew(self):
         return self.crew
 
-
-
     def __str__(self):
         return f"Movie(title={self.title}, year={self.year}, genre={self.genre}, director={self.director}, imageUrl={self.imageUrl})"
 
 
 class Review:
-    def __init__(self, user, movie, rating, comment):
+    def __init__(self, user, movie, rating):
         self.user = user
         self.movie = movie
         self.rating = rating
-        self.comment = comment
 
         # Agregar la reseña a las listas de usuario y película
         user.add_review(self)
@@ -113,8 +118,6 @@ class Review:
 
     def __str__(self):
         return f"Review(user={self.user.username}, movie={self.movie.title}, rating={self.rating}, comment={self.comment})"
-
-
 
 # crear movies
 image_urls = []
@@ -136,6 +139,7 @@ for _, row in data.iterrows():
     if not any(movie.title == row['title'] for movie in movies_list):
         # Crea un objeto Movie con los valores de la fila
         movie = Movie(
+            id=row['id'],
             title=row['title'],
             year=row['year'],
             synopsis="No synopsis available" if row['synopsis'] == "" or pd.isna(row['synopsis']) else row['synopsis'],
@@ -158,10 +162,6 @@ for _, row in data.iterrows():
         # Agrega el objeto Movie a la lista
         movies_list.append(movie)
     i = i + 1  # Incrementa el índice para la URL de la imagen
-
-
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 # Obtener todas las sinopsis
 synopsis_list = [movie.get_synopsis().lower() + " " + movie.get_title().lower() + " " + movie.get_genre().lower() + " " + movie.get_crew().lower() + " " + movie.get_director().lower() for movie in movies_list]
